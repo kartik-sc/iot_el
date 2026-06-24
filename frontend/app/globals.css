@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-space);
+  --font-mono: var(--font-mono);
+}
+
+/* ── Dark mode (default) ── */
+:root {
+  --bg-primary:    #0a0e17;
+  --bg-surface:    #111827;
+  --bg-elevated:   #1a2236;
+  --border:        #1e2d45;
+  --accent:        #00d4ff;
+  --accent-dim:    #00d4ff22;
+  --accent-glow:   0 0 20px #00d4ff55;
+  --success:       #00ff88;
+  --warning:       #ffb800;
+  --error:         #ff4444;
+  --text-primary:  #e8f4f8;
+  --text-secondary:#6b8ca8;
+  --text-mono:     #00d4ff;
+}
+
+/* ── Light mode ── */
+[data-theme="light"] {
+  --bg-primary:    #f0f4f8;
+  --bg-surface:    #ffffff;
+  --bg-elevated:   #e8edf3;
+  --border:        #c8d6e5;
+  --accent:        #0077cc;
+  --accent-dim:    #0077cc18;
+  --accent-glow:   0 0 16px #0077cc44;
+  --success:       #00a854;
+  --warning:       #e68a00;
+  --error:         #cc2222;
+  --text-primary:  #0d1b2a;
+  --text-secondary:#4a6580;
+  --text-mono:     #0077cc;
+}
+
+* {
+  box-sizing: border-box;
+  transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Remove number input spinners */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-surface); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-dim); }
