@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crane Control Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"
+          integrity="sha384-CI3ELBVUz9XQO+97x6nwMDPosPR5XvsxW2ua7N1Xeygeh1IxtgqtCkGfQY9WWdHu"
+          crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"
+          integrity="sha384-wagZhIFgY4hD+7awjQjR4e2E294y6J2HSnd8eTNc15ZubTeQeVRZwhQJ+W6hnBsf"
+          crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"
+          integrity="sha384-ajMUFBUFMCyjh8uxJg6bkGcKe9RTolyjwbxB3yES0QQMenP3Oztj/W9vA2SJPcIh"
+          crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"
+          integrity="sha384-f6/UpzjTjIXASlp20cArQsaRh1EvHVJd5kegy/gYR9W2D0a32TnEqUEiW4Zm/5O0"
+          crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg-primary:   #0a0e17;
+      --bg-surface:   #111827;
+      --bg-elevated:  #1a2236;
+      --border:       #1e2d45;
+      --accent:       #00d4ff;
+      --accent-dim:   #00d4ff22;
+      --accent-glow:  0 0 20px #00d4ff55;
+      --success:      #00ff88;
+      --warning:      #ffb800;
+      --error:        #ff4444;
+      --text-primary: #e8f4f8;
+      --text-sec:     #6b8ca8;
+      --text-mono:    #00d4ff;
+    }
+    [data-theme="light"] {
+      --bg-primary:   #f0f4f8;
+      --bg-surface:   #ffffff;
+      --bg-elevated:  #e8edf3;
+      --border:       #c8d6e5;
+      --accent:       #0077cc;
+      --accent-dim:   #0077cc18;
+      --accent-glow:  0 0 16px #0077cc44;
+      --success:      #00a854;
+      --warning:      #e68a00;
+      --error:        #cc2222;
+      --text-primary: #0d1b2a;
+      --text-sec:     #4a6580;
+      --text-mono:    #0077cc;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    /* ── Header ──────────────────────────────────────────── */
+    .hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .hdr-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-sec);
+    }
+    .hdr-title span { color: var(--accent); }
+    .hdr-right { display: flex; align-items: center; gap: 14px; }
+    .conn-badge { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-sec); }
+    .conn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--error); transition: background 0.3s; }
+    .conn-dot.on { background: var(--success); }
+    .theme-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-sec);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .theme-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Layout ──────────────────────────────────────────── */
+    .main { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Left panel ──────────────────────────────────────── */
+    .left {
+      width: 340px;
+      flex-shrink: 0;
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .left::-webkit-scrollbar { width: 4px; }
+    .left::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .sec-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-sec);
+      margin-bottom: 8px;
+    }
+    hr.div { border: none; border-top: 1px solid var(--border); }
+
+    /* Mode toggle */
+    .mode-toggle {
+      display: flex;
+      padding: 3px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+    }
+    .mode-btn {
+      flex: 1;
+      padding: 7px 8px;
+      border-radius: 999px;
+      border: none;
+      background: none;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      cursor: pointer;
+      color: var(--text-sec);
+      transition: all 0.2s;
+    }
+    .mode-btn.active { background: var(--accent); color: #000; box-shadow: var(--accent-glow); }
+
+    /* Inputs */
+    .fg { margin-bottom: 12px; }
+    .fg:last-child { margin-bottom: 0; }
+    .fl {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      color: var(--text-sec);
+      margin-bottom: 5px;
+    }
+    .fl .a { color: var(--accent); font-family: monospace; font-weight: 700; }
+    .fi, .fs {
+      width: 100%;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 13px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      color: var(--text-primary);
+      outline: none;
+      appearance: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .fi:focus, .fs:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+    .fi::placeholder { color: var(--text-sec); opacity: 0.6; }
+    .fi[type="number"]::-webkit-outer-spin-button,
+    .fi[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .fi[type="number"] { -moz-appearance: textfield; }
+
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      18% { transform: translateX(-6px); }
+      36% { transform: translateX(6px); }
+      54% { transform: translateX(-3px); }
+      72% { transform: translateX(3px); }
+    }
+    .shake { animation: shake 0.4s ease; }
+
+    /* Conversion preview */
+    .conv {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 11px 13px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .conv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
+    .conv-col-lbl {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-sec);
+      margin-bottom: 5px;
+    }
+    .conv-row { display: flex; gap: 5px; margin-bottom: 2px; }
+    .ck { color: var(--text-sec); min-width: 14px; }
+    .cv { color: var(--text-sec); }
+    .cv.hi { color: var(--accent); }
+    .snap-note { margin-top: 6px; color: var(--warning); font-style: italic; font-size: 11px; display: none; }
+
+    /* Buttons */
+    .send-btn {
+      width: 100%;
+      padding: 13px;
+      border-radius: 8px;
+      border: none;
+      background: var(--accent);
+      color: #000;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .send-btn:hover:not(:disabled) { filter: brightness(1.1); }
+    .send-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .send-btn.ok  { background: var(--success); }
+    .send-btn.err { background: var(--error); color: #fff; }
+
+    .estop-btn {
+      width: 100%;
+      padding: 9px;
+      border-radius: 8px;
+      border: 1px solid var(--error);
+      background: rgba(255,68,68,0.07);
+      color: var(--error);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .estop-btn:hover { background: rgba(255,68,68,0.18); }
+
+    /* Last command */
+    .last-cmd {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 13px;
+      font-family: monospace;
+      font-size: 12px;
+      line-height: 1.85;
+      min-height: 78px;
+    }
+
+    /* Telemetry */
+    .telem-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .tr { display: flex; flex-direction: column; gap: 5px; }
+    .tr-lbl { font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-sec); }
+    .tr-val { font-family: monospace; font-size: 22px; font-weight: 700; color: var(--text-mono); line-height: 1; }
+    .tr-bar { height: 3px; background: var(--border); border-radius: 999px; overflow: hidden; }
+    .tr-fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.5s ease; width: 0%; }
+
+    .telem-badges { display: flex; flex-wrap: wrap; gap: 10px; font-size: 10px; align-items: center; }
+    .tb-grp { display: flex; align-items: center; gap: 5px; }
+    .tb-lbl { font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-sec); }
+    .badge {
+      font-family: monospace;
+      font-weight: 700;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .b-idle   { color: var(--accent);  background: var(--accent-dim);       border: 1px solid var(--accent); }
+    .b-moving { color: var(--warning); background: rgba(255,184,0,.10);     border: 1px solid var(--warning); }
+    .b-error  { color: var(--error);   background: rgba(255,68,68,.10);     border: 1px solid var(--error); }
+    .b-ok     { color: var(--success); background: rgba(0,255,136,.12); }
+    .b-syserr { color: var(--error);   background: rgba(255,68,68,.12); }
+
+    .fault-banner {
+      background: rgba(255,68,68,.1);
+      border: 1px solid var(--error);
+      border-radius: 8px;
+      padding: 7px 12px;
+      color: var(--error);
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      display: none;
+    }
+
+    /* ── Right panel / canvas ────────────────────────────── */
+    .right { flex: 1; position: relative; overflow: hidden; }
+    #cvs { display: block; width: 100%; height: 100%; }
+
+    .cv-overlay {
+      position: absolute;
+      top: 12px; right: 12px;
+      font-family: monospace;
+      font-size: 11px;
+      color: var(--text-sec);
+      background: rgba(10,14,23,.78);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 13px;
+      pointer-events: none;
+      line-height: 1.75;
+      backdrop-filter: blur(4px);
+    }
+    .cv-overlay span { color: var(--accent); }
+    .cv-hint {
+      position: absolute;
+      bottom: 12px; left: 50%; transform: translateX(-50%);
+      font-size: 11px;
+      color: var(--text-sec);
+      opacity: 0.45;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    /* ── Confirmation dialog ──────────────────────────────── */
+    .overlay {
+      position: fixed; inset: 0; z-index: 600;
+      display: none;
+      align-items: center; justify-content: center;
+      padding: 16px;
+      background: rgba(0,0,0,.65);
+      animation: fadeIn 0.2s ease-out;
+    }
+    .overlay.open { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .dlg {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px;
+      max-width: 400px;
+      width: 100%;
+      animation: scaleIn 0.2s ease-out;
+    }
+    @keyframes scaleIn { from { transform: scale(.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    .dlg-title {
+      display: flex; align-items: center; gap: 8px;
+      color: var(--warning);
+      font-weight: 700; font-size: 12px; letter-spacing: 0.08em;
+      margin-bottom: 18px;
+    }
+    .dlg-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+      font-family: monospace; font-size: 13px; margin-bottom: 14px;
+    }
+    .dlg-col-lbl {
+      font-size: 9px; font-weight: 700; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--text-sec); margin-bottom: 5px;
+    }
+    .dlg-row { display: flex; gap: 8px; margin-bottom: 3px; }
+    .dk { color: var(--text-sec); min-width: 18px; }
+    .dv { color: var(--accent); }
+    .dlg-snap {
+      font-family: monospace; font-size: 11px;
+      color: var(--warning); font-style: italic;
+      padding: 7px 11px;
+      background: rgba(255,184,0,.08);
+      border: 1px solid rgba(255,184,0,.2);
+      border-radius: 8px; margin-bottom: 14px;
+      display: none;
+    }
+    .dlg-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+    .btn-cancel {
+      padding: 9px 18px;
+      background: none; border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text-sec);
+      font-size: 12px; font-weight: 600; letter-spacing: 0.06em;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-cancel:hover { border-color: var(--text-sec); color: var(--text-primary); }
+    .btn-confirm {
+      padding: 9px 18px;
+      background: var(--accent); border: none;
+      border-radius: 8px; color: #000;
+      font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
+      cursor: pointer; transition: filter 0.2s;
+    }
+    .btn-confirm:hover { filter: brightness(1.1); }
+    .btn-confirm:disabled { opacity: 0.5; }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ────────────────────────────────────────────── -->
+<header class="hdr">
+  <div class="hdr-title">CRANE CONTROL <span>//</span> DASHBOARD</div>
+  <div class="hdr-right">
+    <div class="conn-badge">
+      <div class="conn-dot" id="cDot"></div>
+      <span id="cLabel">Disconnected</span>
+    </div>
+    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">☀ Light</button>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- ── Left Panel ─────────────────────────────────────── -->
+  <div class="left">
+
+    <!-- Mode toggle -->
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="btnCart" onclick="setMode('cart')">CARTESIAN &nbsp;x · y · z</button>
+      <button class="mode-btn"        id="btnCyl"  onclick="setMode('cyl')">CYLINDRICAL &nbsp;θ · R · H</button>
+    </div>
+
+    <!-- Cartesian inputs -->
+    <div id="cartInputs">
+      <div class="fg" id="fg-cx">
+        <label class="fl"><span class="a">x</span> — along boom direction</label>
+        <input class="fi" type="number" step="any" placeholder="cm" id="cx" oninput="onInput()">
+      </div>
+      <div class="fg" id="fg-cy">
+        <label class="fl"><span class="a">y</span> — perpendicular to boom</label>
+        <input class="fi" type="number" step="any" placeholder="cm" id="cy" oninput="onInput()">
+      </div>
+      <div class="fg" id="fg-cz">
+        <label class="fl"><span class="a">z</span> — hook height (vertical)</label>
+        <input class="fi" type="number" step="any" placeholder="cm" id="cz" oninput="onInput()">
+      </div>
+    </div>
+
+    <!-- Cylindrical inputs -->
+    <div id="cylInputs" style="display:none">
+      <div class="fg" id="fg-th">
+        <label class="fl"><span class="a">θ</span> — boom angle</label>
+        <select class="fs" id="cth" onchange="onInput()">
+          <option value="">— select —</option>
+          <option value="0">0°</option>
+          <option value="30">30°</option>
+          <option value="60">60°</option>
+          <option value="90">90°</option>
+        </select>
+      </div>
+      <div class="fg" id="fg-R">
+        <label class="fl"><span class="a">R</span> — trolley distance</label>
+        <input class="fi" type="number" step="any" placeholder="cm from pivot" id="cR" oninput="onInput()">
+      </div>
+      <div class="fg" id="fg-H">
+        <label class="fl"><span class="a">H</span> — hook height</label>
+        <input class="fi" type="number" step="any" placeholder="cm" id="cH" oninput="onInput()">
+      </div>
+    </div>
+
+    <!-- Conversion preview -->
+    <div class="conv">
+      <div class="sec-label" style="margin-bottom:4px">Coordinate Preview</div>
+      <div class="conv-grid">
+        <div>
+          <div class="conv-col-lbl">Cartesian</div>
+          <div class="conv-row"><span class="ck">x</span><span class="cv" id="pvX">—</span></div>
+          <div class="conv-row"><span class="ck">y</span><span class="cv" id="pvY">—</span></div>
+          <div class="conv-row"><span class="ck">z</span><span class="cv" id="pvZ">—</span></div>
+        </div>
+        <div>
+          <div class="conv-col-lbl">Cylindrical</div>
+          <div class="conv-row"><span class="ck">θ</span><span class="cv" id="pvTh">—</span></div>
+          <div class="conv-row"><span class="ck">R</span><span class="cv" id="pvR">—</span></div>
+          <div class="conv-row"><span class="ck">H</span><span class="cv" id="pvH">—</span></div>
+        </div>
+      </div>
+      <div class="snap-note" id="snapNote"></div>
+    </div>
+
+    <!-- Send -->
+    <button class="send-btn" id="sendBtn" onclick="openDialog()">REVIEW &amp; SEND ▶</button>
+
+    <!-- Last command -->
+    <div class="last-cmd" id="lastCmd">
+      <span style="color:var(--text-sec);opacity:.5;font-style:italic;font-size:11px">No command sent yet.</span>
+    </div>
+
+    <hr class="div">
+
+    <!-- Telemetry -->
+    <div>
+      <div class="sec-label">Live Telemetry</div>
+      <div class="fault-banner" id="faultBanner"></div>
+      <div class="telem-grid">
+        <div class="tr">
+          <div class="tr-lbl">θ Boom</div>
+          <div class="tr-val" id="tTh">—</div>
+          <div class="tr-bar"><div class="tr-fill" id="tbTh"></div></div>
+        </div>
+        <div class="tr">
+          <div class="tr-lbl">R Trolley</div>
+          <div class="tr-val" id="tR">—</div>
+          <div class="tr-bar"><div class="tr-fill" id="tbR"></div></div>
+        </div>
+        <div class="tr">
+          <div class="tr-lbl">H Hook</div>
+          <div class="tr-val" id="tH">—</div>
+          <div class="tr-bar"><div class="tr-fill" id="tbH"></div></div>
+        </div>
+      </div>
+      <div class="telem-badges">
+        <div class="tb-grp"><span class="tb-lbl">System</span><span class="badge b-ok"    id="bSys">OK</span></div>
+        <div class="tb-grp"><span class="tb-lbl">Motor</span> <span class="badge b-idle"  id="bMot">IDLE</span></div>
+        <div class="tb-grp"><span class="tb-lbl">Updated</span><span style="font-family:monospace;color:var(--text-sec);font-size:10px" id="bUpd">—</span></div>
+      </div>
+    </div>
+
+    <hr class="div">
+
+    <button class="estop-btn" onclick="sendEStop()">⬛ EMERGENCY STOP</button>
+  </div>
+
+  <!-- ── Right Panel: 3D canvas ─────────────────────────── -->
+  <div class="right">
+    <canvas id="cvs"></canvas>
+    <div class="cv-overlay">
+      θ <span id="ovTh">0.0°</span><br>
+      R <span id="ovR">0.0 cm</span><br>
+      H <span id="ovH">0.0 cm</span>
+    </div>
+    <div class="cv-hint">Drag to orbit · Scroll to zoom · Right-drag to pan</div>
+  </div>
+</div>
+
+<!-- ── Confirmation Dialog ────────────────────────────────── -->
+<div class="overlay" id="overlay" onclick="overlayBg(event)">
+  <div class="dlg">
+    <div class="dlg-title">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      CONFIRM CRANE MOVEMENT
+    </div>
+    <div class="dlg-grid">
+      <div>
+        <div class="dlg-col-lbl">Cartesian</div>
+        <div class="dlg-row"><span class="dk">x</span><span class="dv" id="dlgX">—</span></div>
+        <div class="dlg-row"><span class="dk">y</span><span class="dv" id="dlgY">—</span></div>
+        <div class="dlg-row"><span class="dk">z</span><span class="dv" id="dlgZ">—</span></div>
+      </div>
+      <div>
+        <div class="dlg-col-lbl">Cylindrical</div>
+        <div class="dlg-row"><span class="dk">θ</span><span class="dv" id="dlgTh">—</span></div>
+        <div class="dlg-row"><span class="dk">R</span><span class="dv" id="dlgR">—</span></div>
+        <div class="dlg-row"><span class="dk">H</span><span class="dv" id="dlgH">—</span></div>
+      </div>
+    </div>
+    <div class="dlg-snap" id="dlgSnap"></div>
+    <div class="dlg-actions">
+      <button class="btn-cancel" onclick="closeDialog()">CANCEL</button>
+      <button class="btn-confirm" id="btnConfirm" onclick="confirmSend()">CONFIRM →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// FIREBASE CONFIG — paste your project values here
+// ═══════════════════════════════════════════════════════════════
+const FB_CONFIG = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID",
+};
+const FB_NS = ""; // e.g. "crane-1"  (empty = root paths)
+
+// ═══════════════════════════════════════════════════════════════
+// KINEMATICS CONSTANTS  (mirrors types/crane.ts)
+// ═══════════════════════════════════════════════════════════════
+const LIMITS = { theta:{min:0,max:90}, R:{min:0,max:40}, H:{min:0,max:30} };
+const VALID_THETA = [0,30,60,90];
+
+// ═══════════════════════════════════════════════════════════════
+// COORDINATE MATH  (mirrors lib/coordConverter.ts)
+// ═══════════════════════════════════════════════════════════════
+function snapTheta(raw) {
+  return VALID_THETA.reduce((p,c) => Math.abs(c-raw)<Math.abs(p-raw)?c:p);
+}
+function cylToCart(th,R,H) {
+  const r = th*Math.PI/180;
+  return { x:R*Math.cos(r), y:R*Math.sin(r), z:H };
+}
+function cartToCyl(x,y,z) {
+  const R = Math.sqrt(x*x+y*y);
+  const raw = Math.atan2(y,x)*180/Math.PI;
+  const th  = snapTheta(raw);
+  return { cyl:{theta:th,R,H:z}, thetaRaw:raw, snapped:Math.abs(th-raw)>0.01 };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UI STATE
+// ═══════════════════════════════════════════════════════════════
+let mode       = 'cart';
+let pending    = null;
+let sendStatus = 'idle';
+let motorStatus= 'IDLE';
+let fbDb       = null;
+
+// ── Mode switch ────────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  document.getElementById('cartInputs').style.display = m==='cart' ? '' : 'none';
+  document.getElementById('cylInputs').style.display  = m==='cyl'  ? '' : 'none';
+  document.getElementById('btnCart').classList.toggle('active', m==='cart');
+  document.getElementById('btnCyl').classList.toggle('active',  m==='cyl');
+  ['cx','cy','cz','cR','cH'].forEach(id=>{ document.getElementById(id).value=''; });
+  document.getElementById('cth').value = '';
+  onInput();
+}
+
+// ── Live conversion preview ────────────────────────────────────
+function onInput() {
+  const isCart = mode==='cart';
+  let conv = null;
+  if (isCart) {
+    const x=parseFloat(document.getElementById('cx').value);
+    const y=parseFloat(document.getElementById('cy').value);
+    const z=parseFloat(document.getElementById('cz').value);
+    if (!isNaN(x)&&!isNaN(y)&&!isNaN(z)) {
+      const {cyl,thetaRaw,snapped}=cartToCyl(x,y,z);
+      conv={cart:{x,y,z},cyl,thetaRaw,snapped};
+    }
+  } else {
+    const th=parseInt(document.getElementById('cth').value,10);
+    const R=parseFloat(document.getElementById('cR').value);
+    const H=parseFloat(document.getElementById('cH').value);
+    if (!isNaN(th)&&!isNaN(R)&&!isNaN(H)) {
+      const cart=cylToCart(th,R,H);
+      conv={cart,cyl:{theta:th,R,H},thetaRaw:th,snapped:false};
+    }
+  }
+  const set=(id,v,hi)=>{
+    const el=document.getElementById(id);
+    el.textContent=v; el.className='cv'+(hi?' hi':'');
+  };
+  if (conv) {
+    set('pvX', conv.cart.x.toFixed(2)+' cm', isCart);
+    set('pvY', conv.cart.y.toFixed(2)+' cm', isCart);
+    set('pvZ', conv.cart.z.toFixed(2)+' cm', isCart);
+    set('pvTh',conv.cyl.theta+'°',           !isCart);
+    set('pvR', conv.cyl.R.toFixed(2)+' cm',  !isCart);
+    set('pvH', conv.cyl.H.toFixed(2)+' cm',  !isCart);
+    const sn=document.getElementById('snapNote');
+    if (conv.snapped) { sn.textContent='← snapped from '+conv.thetaRaw.toFixed(1)+'°'; sn.style.display=''; }
+    else sn.style.display='none';
+  } else {
+    ['pvX','pvY','pvZ','pvTh','pvR','pvH'].forEach(id=>{
+      document.getElementById(id).textContent='—';
+      document.getElementById(id).className='cv';
+    });
+    document.getElementById('snapNote').style.display='none';
+  }
+}
+
+// ── Shake invalid field ────────────────────────────────────────
+function shake(id) {
+  const el=document.getElementById(id);
+  el.classList.remove('shake');
+  void el.offsetWidth;
+  el.classList.add('shake');
+  el.addEventListener('animationend',()=>el.classList.remove('shake'),{once:true});
+}
+
+function validate() {
+  let ok=true;
+  if (mode==='cart') {
+    if (isNaN(parseFloat(document.getElementById('cx').value))) { shake('fg-cx'); ok=false; }
+    if (isNaN(parseFloat(document.getElementById('cy').value))) { shake('fg-cy'); ok=false; }
+    if (isNaN(parseFloat(document.getElementById('cz').value))) { shake('fg-cz'); ok=false; }
+  } else {
+    if (!document.getElementById('cth').value)                 { shake('fg-th'); ok=false; }
+    if (isNaN(parseFloat(document.getElementById('cR').value))){ shake('fg-R');  ok=false; }
+    if (isNaN(parseFloat(document.getElementById('cH').value))){ shake('fg-H');  ok=false; }
+  }
+  return ok;
+}
+
+// ── Dialog ─────────────────────────────────────────────────────
+function openDialog() {
+  if (!validate()) return;
+  if (motorStatus==='MOVING'||sendStatus==='sending') return;
+  let th,R,H,cart,snapped=false,rawTh=0;
+  if (mode==='cart') {
+    const x=parseFloat(document.getElementById('cx').value);
+    const y=parseFloat(document.getElementById('cy').value);
+    const z=parseFloat(document.getElementById('cz').value);
+    const res=cartToCyl(x,y,z);
+    th=res.cyl.theta; R=res.cyl.R; H=res.cyl.H;
+    cart={x,y,z}; snapped=res.snapped; rawTh=res.thetaRaw;
+  } else {
+    th=parseInt(document.getElementById('cth').value,10);
+    R=parseFloat(document.getElementById('cR').value);
+    H=parseFloat(document.getElementById('cH').value);
+    cart=cylToCart(th,R,H);
+  }
+  pending={theta:th,R,H,x:cart.x,y:cart.y,z:cart.z,snapped,rawTheta:rawTh};
+  document.getElementById('dlgX').textContent=cart.x.toFixed(2)+' cm';
+  document.getElementById('dlgY').textContent=cart.y.toFixed(2)+' cm';
+  document.getElementById('dlgZ').textContent=cart.z.toFixed(2)+' cm';
+  document.getElementById('dlgTh').textContent=th+'°';
+  document.getElementById('dlgR').textContent=R.toFixed(2)+' cm';
+  document.getElementById('dlgH').textContent=H.toFixed(2)+' cm';
+  const sn=document.getElementById('dlgSnap');
+  if (snapped) { sn.textContent='snapped from '+rawTh.toFixed(1)+'° — nearest valid: '+th+'°'; sn.style.display=''; }
+  else sn.style.display='none';
+  document.getElementById('overlay').classList.add('open');
+}
+function closeDialog() {
+  document.getElementById('overlay').classList.remove('open');
+  pending=null;
+}
+function overlayBg(e) { if(e.target===e.currentTarget) closeDialog(); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeDialog(); });
+
+async function confirmSend() {
+  if (!pending) return;
+  closeDialog();
+  await sendCommand(pending.theta,pending.R,pending.H);
+  ['cx','cy','cz','cR','cH'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('cth').value='';
+  onInput();
+}
+
+// ── Send command ───────────────────────────────────────────────
+async function sendCommand(theta,R,H) {
+  setSendStatus('sending');
+  const id='cmd_'+Math.random().toString(36).slice(2,7);
+  const cmd={command_id:id,target_theta:theta,target_R:R,target_H:H,timestamp:new Date().toISOString()};
+  renderLastCmd(cmd);
+  // Optimistic: update 3D scene immediately
+  craneTarget.theta=theta; craneTarget.R=R; craneTarget.H=H;
+  if (fbDb) {
+    const path=(FB_NS?'/'+FB_NS:'')+'/commands/latest';
+    try { await fbDb.ref(path).set(cmd); setSendStatus('ok'); }
+    catch(e) { setSendStatus('err'); }
+  } else { setSendStatus('ok'); }
+  setTimeout(()=>setSendStatus('idle'),2200);
+}
+async function sendEStop() {
+  if (!fbDb) return;
+  const path=(FB_NS?'/'+FB_NS:'')+'/commands/estop';
+  await fbDb.ref(path).set({emergency:true,timestamp:new Date().toISOString()});
+}
+
+function setSendStatus(s) {
+  sendStatus=s;
+  const btn=document.getElementById('sendBtn');
+  btn.className='send-btn'+(s==='ok'?' ok':s==='err'?' err':'');
+  btn.disabled=(s==='sending'||motorStatus==='MOVING');
+  btn.textContent=s==='ok'?'✓ DISPATCHED':s==='err'?'✗ FAILED — check connection':'REVIEW & SEND ▶';
+}
+
+function renderLastCmd(cmd) {
+  document.getElementById('lastCmd').innerHTML=
+    `<div><span style="color:var(--text-sec)">CMD&nbsp;&nbsp;</span><span style="color:var(--accent)">${cmd.command_id}</span></div>`+
+    `<div><span style="color:var(--text-sec)">θ&nbsp;</span><span style="color:var(--accent)">${cmd.target_theta}°</span>`+
+    `<span style="color:var(--text-sec)">&nbsp;&nbsp;R&nbsp;</span><span style="color:var(--accent)">${Number(cmd.target_R).toFixed(2)} cm</span>`+
+    `<span style="color:var(--text-sec)">&nbsp;&nbsp;H&nbsp;</span><span style="color:var(--accent)">${Number(cmd.target_H).toFixed(2)} cm</span></div>`+
+    `<div><span style="color:var(--text-sec)">SENT&nbsp;</span><span style="color:var(--text-primary)">${new Date(cmd.timestamp).toLocaleTimeString()}</span></div>`;
+}
+
+// ── Telemetry UI ───────────────────────────────────────────────
+function updateTelemUI(t) {
+  motorStatus=t.motor_status||'IDLE';
+  const fmt=(v,u)=>v!=null?`${v}${u}`:'—';
+  document.getElementById('tTh').textContent=fmt(t.current_theta,'°');
+  document.getElementById('tR').textContent =fmt(t.current_R,' cm');
+  document.getElementById('tH').textContent =fmt(t.current_H,' cm');
+  document.getElementById('tbTh').style.width=pct(t.current_theta,LIMITS.theta.max);
+  document.getElementById('tbR').style.width =pct(t.current_R,    LIMITS.R.max);
+  document.getElementById('tbH').style.width =pct(t.current_H,    LIMITS.H.max);
+  const sysOk=t.system_status==='OK';
+  const bSys=document.getElementById('bSys');
+  bSys.textContent=t.system_status||'OK';
+  bSys.className='badge '+(sysOk?'b-ok':'b-syserr');
+  const ms=(t.motor_status||'IDLE').toUpperCase();
+  const bMot=document.getElementById('bMot');
+  bMot.textContent=ms;
+  bMot.className='badge '+(ms==='IDLE'?'b-idle':ms==='MOVING'?'b-moving':'b-error');
+  if (t.last_updated) document.getElementById('bUpd').textContent=new Date(t.last_updated).toLocaleTimeString();
+  const fault=!sysOk||ms==='ERROR'||ms==='TIMEOUT';
+  const fb=document.getElementById('faultBanner');
+  fb.style.display=fault?'':'none';
+  if (fault) fb.textContent=`⚠ ${!sysOk?t.system_status:ms} — check hardware`;
+}
+function pct(v,max){ return Math.min(100,Math.max(0,(v??0)/max*100))+'%'; }
+
+// ── Theme ──────────────────────────────────────────────────────
+function toggleTheme() {
+  const light=document.documentElement.getAttribute('data-theme')==='light';
+  document.documentElement.setAttribute('data-theme',light?'':'light');
+  document.getElementById('themeBtn').textContent=light?'☀ Light':'☾ Dark';
+  if (scene) scene.background=new THREE.Color(light?0x0a0e17:0xf0f4f8);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// THREE.JS  —  3D CRANE SCENE
+// Scale: 1 world unit = 10 cm  →  max R=4u, max H=3u
+// ═══════════════════════════════════════════════════════════════
+const S         = 0.1;    // cm → world units
+const MAST_H    = 6.0;    // world units (~60cm visual mast)
+const MAX_R_W   = LIMITS.R.max * S;   // 4.0
+const MAX_H_W   = LIMITS.H.max * S;   // 3.0
+const CJIB_W    = 1.6;
+
+let scene, camera, renderer, controls;
+let parts = {};
+let craneTarget  = {theta:0,R:0,H:0};
+let craneCurrent = {theta:0,R:0,H:0};
+
+function lerp(a,b,t){ return a+(b-a)*t; }
+
+function initScene() {
+  const canvas    = document.getElementById('cvs');
+  const container = canvas.parentElement;
+
+  renderer = new THREE.WebGLRenderer({canvas,antialias:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.setClearColor(0x0a0e17,1);
+
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x0a0e17,0.028);
+
+  camera = new THREE.PerspectiveCamera(48,1,0.1,200);
+  camera.position.set(9,7,9);
+
+  controls = new THREE.OrbitControls(camera,renderer.domElement);
+  controls.target.set(0,MAST_H*0.42,0);
+  controls.enableDamping=true;
+  controls.dampingFactor=0.08;
+  controls.minDistance=3;
+  controls.maxDistance=28;
+  controls.maxPolarAngle=Math.PI*0.47;
+  camera.lookAt(controls.target);
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0x1a2a3a,2.2));
+  const sun=new THREE.DirectionalLight(0x00d4ff,0.9);
+  sun.position.set(6,12,6); sun.castShadow=true;
+  sun.shadow.mapSize.set(1024,1024);
+  scene.add(sun);
+  scene.add(Object.assign(new THREE.DirectionalLight(0x001833,0.6),{position:new THREE.Vector3(-6,4,-6)}));
+
+  // Ground
+  const gridHelper=new THREE.GridHelper(40,40,0x1e2d45,0x1e2d45);
+  gridHelper.material.opacity=0.45; gridHelper.material.transparent=true;
+  scene.add(gridHelper);
+  const ground=new THREE.Mesh(
+    new THREE.PlaneGeometry(40,40),
+    new THREE.MeshStandardMaterial({color:0x080c14,roughness:1})
+  );
+  ground.rotation.x=-Math.PI/2; ground.receiveShadow=true;
+  scene.add(ground);
+
+  buildCrane();
+
+  function resize() {
+    const w=container.clientWidth, h=container.clientHeight;
+    renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix();
+  }
+  resize();
+  new ResizeObserver(resize).observe(container);
+
+  (function tick(){
+    requestAnimationFrame(tick);
+    craneCurrent.theta=lerp(craneCurrent.theta,craneTarget.theta,0.055);
+    craneCurrent.R    =lerp(craneCurrent.R,    craneTarget.R,    0.055);
+    craneCurrent.H    =lerp(craneCurrent.H,    craneTarget.H,    0.055);
+    applyKinematics();
+    controls.update();
+    renderer.render(scene,camera);
+  })();
+}
+
+function mat(color,rough,metal,emissive,emissInt) {
+  return new THREE.MeshStandardMaterial({
+    color, roughness:rough??0.5, metalness:metal??0.5,
+    emissive:emissive??0x000000, emissiveIntensity:emissInt??0
+  });
+}
+
+function buildCrane() {
+  const ACCENT=0x00d4ff, DARK=0x1a2236, MID=0x243448;
+
+  // ── Base plate ──
+  const base=new THREE.Mesh(new THREE.BoxGeometry(1.4,0.14,1.4),mat(DARK,0.7,0.6));
+  base.position.set(0,0.07,0); base.castShadow=true; base.receiveShadow=true;
+  scene.add(base);
+
+  // ── Mast ──
+  const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.13,MAST_H,10),mat(MID,0.6,0.7));
+  mast.position.set(0,MAST_H/2+0.14,0); mast.castShadow=true;
+  scene.add(mast);
+
+  // Mast accent rings
+  for(let i=0;i<6;i++){
+    const y=0.6+i*(MAST_H-0.6)/6;
+    const ring=new THREE.Mesh(
+      new THREE.TorusGeometry(0.13,0.016,6,14),
+      mat(ACCENT,0.3,0.9,ACCENT,0.12)
+    );
+    ring.rotation.x=Math.PI/2; ring.position.set(0,y+0.14,0);
+    scene.add(ring);
+  }
+
+  // ── Boom pivot group (yaw = θ) ──
+  const pivot=new THREE.Group();
+  pivot.position.set(0,MAST_H+0.14,0);
+  scene.add(pivot);
+  parts.pivot=pivot;
+
+  // Apex cap
+  pivot.add(Object.assign(
+    new THREE.Mesh(new THREE.SphereGeometry(0.2,14,10),mat(ACCENT,0.2,0.9,ACCENT,0.3)),
+    {castShadow:true}
+  ));
+
+  // Boom jib
+  const boom=new THREE.Mesh(new THREE.BoxGeometry(MAX_R_W,0.1,0.16),mat(ACCENT,0.3,0.8,ACCENT,0.06));
+  boom.position.set(MAX_R_W/2,0,0); boom.castShadow=true;
+  pivot.add(boom);
+
+  // Support cable apex→tip
+  const sCable=new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0.3,0),new THREE.Vector3(MAX_R_W,-0.05,0)]),
+    new THREE.LineBasicMaterial({color:ACCENT,opacity:0.35,transparent:true})
+  );
+  pivot.add(sCable);
+
+  // Counter-jib
+  const cjib=new THREE.Mesh(
+    new THREE.BoxGeometry(CJIB_W,0.09,0.13),
+    mat(MID,0.7,0.5,0,0)
+  );
+  cjib.position.set(-CJIB_W/2-0.04,0,0); pivot.add(cjib);
+
+  // Counter-weight
+  const cw=new THREE.Mesh(new THREE.BoxGeometry(0.32,0.32,0.32),mat(DARK,0.8,0.5));
+  cw.position.set(-CJIB_W-0.12,-0.11,0); pivot.add(cw);
+
+  // Counter-jib cable
+  const cjCable=new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0.3,0),new THREE.Vector3(-CJIB_W,-0.05,0)]),
+    new THREE.LineBasicMaterial({color:ACCENT,opacity:0.28,transparent:true})
+  );
+  pivot.add(cjCable);
+
+  // ── Trolley group (translates along +X on boom) ──
+  const trolley=new THREE.Group();
+  trolley.position.set(0,-0.08,0);
+  pivot.add(trolley);
+  parts.trolley=trolley;
+
+  trolley.add(Object.assign(
+    new THREE.Mesh(new THREE.BoxGeometry(0.26,0.17,0.28),mat(ACCENT,0.2,0.9,ACCENT,0.2)),
+    {castShadow:true}
+  ));
+
+  // Wheels
+  const wMat=mat(0x222222,0.2,0.9);
+  [[-.1,-.08,-.11],[.1,-.08,-.11],[-.1,-.08,.11],[.1,-.08,.11]].forEach(([x,y,z])=>{
+    const w=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.06,8),wMat);
+    w.rotation.x=Math.PI/2; w.position.set(x,y,z);
+    trolley.add(w);
+  });
+
+  // Trolley point light
+  const tl=new THREE.PointLight(ACCENT,0.6,2.5);
+  trolley.add(tl);
+
+  // ── Rope ──
+  const ropeGeo=new THREE.BufferGeometry();
+  ropeGeo.setAttribute('position',new THREE.Float32BufferAttribute([0,0,0, 0,-0.1,0],3));
+  const rope=new THREE.Line(ropeGeo,new THREE.LineBasicMaterial({color:0x6b8ca8,opacity:0.75,transparent:true}));
+  rope.position.set(0,-0.085,0);
+  trolley.add(rope);
+  parts.rope=rope;
+
+  // ── Hook ──
+  const hook=new THREE.Group();
+  hook.position.set(0,-0.085,0);
+  trolley.add(hook);
+  parts.hook=hook;
+
+  // Shank
+  hook.add(new THREE.Mesh(new THREE.CylinderGeometry(0.024,0.024,0.1,6),mat(ACCENT,0.3,0.9,ACCENT,0.08)));
+
+  // Hook curve (partial torus)
+  const hCurve=new THREE.Mesh(
+    new THREE.TorusGeometry(0.085,0.024,6,14,Math.PI),
+    mat(ACCENT,0.3,0.9,ACCENT,0.06)
+  );
+  hCurve.rotation.z=Math.PI/2; hCurve.position.set(0.05,-0.11,0);
+  hook.add(hCurve);
+
+  // ── Swept volume arc ──
+  // Semi-transparent ring at boom height showing 0→90° range
+  const sweepMesh=new THREE.Mesh(
+    new THREE.RingGeometry(0.1,MAX_R_W,64,1,0,Math.PI/2),
+    new THREE.MeshBasicMaterial({color:ACCENT,opacity:0.055,transparent:true,side:THREE.DoubleSide})
+  );
+  sweepMesh.rotation.x=-Math.PI/2;
+  sweepMesh.position.set(0,MAST_H+0.14,0);
+  scene.add(sweepMesh);
+
+  // Swept arc border line
+  const arcPts=[new THREE.Vector3(0,0,0)];
+  for(let a=0;a<=90;a+=2){
+    const r=a*Math.PI/180;
+    arcPts.push(new THREE.Vector3(MAX_R_W*Math.cos(r),0,MAX_R_W*Math.sin(r)));
+  }
+  arcPts.push(new THREE.Vector3(0,0,0));
+  const arcLine=new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(arcPts),
+    new THREE.LineBasicMaterial({color:ACCENT,opacity:0.22,transparent:true})
+  );
+  arcLine.position.set(0,MAST_H+0.14,0);
+  scene.add(arcLine);
+}
+
+function applyKinematics() {
+  if (!parts.pivot) return;
+  const {theta,R,H}=craneCurrent;
+
+  // Boom yaw — θ=0 → +X, θ=90 → +Z
+  parts.pivot.rotation.y = -(theta*Math.PI/180);
+
+  // Trolley slide, clamped
+  const rW=Math.max(0,Math.min(MAX_R_W,R*S));
+  parts.trolley.position.x=rW;
+
+  // Rope length + hook position
+  const hW=Math.max(0,Math.min(MAX_H_W,H*S));
+  const pos=parts.rope.geometry.attributes.position;
+  pos.setXYZ(0,0,0,0);
+  pos.setXYZ(1,0,-(hW+0.04),0);
+  pos.needsUpdate=true;
+  parts.hook.position.y=-0.085-hW;
+
+  // Overlay text
+  document.getElementById('ovTh').textContent=theta.toFixed(1)+'°';
+  document.getElementById('ovR').textContent =R.toFixed(1)+' cm';
+  document.getElementById('ovH').textContent =H.toFixed(1)+' cm';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FIREBASE
+// ═══════════════════════════════════════════════════════════════
+function initFirebase() {
+  try {
+    const app=firebase.apps.length?firebase.apps[0]:firebase.initializeApp(FB_CONFIG);
+    fbDb=firebase.database(app);
+
+    fbDb.ref('.info/connected').on('value',snap=>{
+      const on=!!snap.val();
+      document.getElementById('cDot').className='conn-dot'+(on?' on':'');
+      document.getElementById('cLabel').textContent=on?'Connected':'Disconnected';
+    });
+
+    const telemPath=(FB_NS?'/'+FB_NS:'')+'/telemetry/latest';
+    fbDb.ref(telemPath).on('value',snap=>{
+      const d=snap.val();
+      if(d) updateTelemUI(d);
+    });
+  } catch(e) {
+    console.warn('Firebase not configured — running offline.',e.message);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded',()=>{
+  initScene();
+  initFirebase();
+});
+</script>
+</body>
+</html>
