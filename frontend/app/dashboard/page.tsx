@@ -7,6 +7,7 @@ import { useCommandHistory } from "@/hooks/useCommandHistory";
 import { CommandPanel } from "@/components/dashboard/CommandPanel";
 import { TelemetryPanel } from "@/components/dashboard/TelemetryPanel";
 import { CraneAnimationPanel } from "@/components/crane/CraneAnimationPanel";
+import { CraneSideView } from "@/components/crane/CraneSideView";
 
 // TODO: Replace null with actual crane_id once cranes API is seeded
 const CRANE_ID: string | null = null;
@@ -158,9 +159,20 @@ export default function DashboardPage() {
 
       </main>
 
-      {/* ── Crane Animation Panel (full width, second row) ── */}
-      <div className="px-6 pb-6">
-        <CraneAnimationPanel history={history} />
+      {/* ── Crane View row: 2D side elevation (left) + 3D canvas (right) ── */}
+      <div className="px-6 pb-6 flex flex-col lg:flex-row gap-5 items-stretch">
+        {/* 2D mechanical orthographic view */}
+        <div className="lg:w-[520px] shrink-0 h-[420px]">
+          <CraneSideView
+            history={history}
+            telemetry={telemetry}
+            connected={connected}
+          />
+        </div>
+        {/* 3D canvas */}
+        <div className="flex-1 h-[420px]">
+          <CraneAnimationPanel history={history} />
+        </div>
       </div>
 
       {/* ── Status bar ── */}
